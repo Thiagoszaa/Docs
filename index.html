@@ -14,7 +14,6 @@
             --text-dark: #333333;
             --text-light: #606266;
             --border: #dcdfe6;
-            --success: #2c3e50;
         }
 
         body { 
@@ -79,7 +78,7 @@
         .input-group { display: flex; flex-direction: column; gap: 8px; }
 
         .input-group label { 
-            font-size: 12px; 
+            font-size: 11px; 
             font-weight: 700; 
             color: var(--text-light);
             text-transform: uppercase;
@@ -127,57 +126,94 @@
             border: 1px solid var(--primary);
         }
 
-        .btn-primary:hover {
-            background: var(--accent);
-            border-color: var(--accent);
-            transform: translateY(-1px);
-        }
-
         .btn-clear {
             background: #fdfdfd;
             color: #999;
             border: 1px solid #ddd;
         }
 
-        .btn-clear:hover { background: #fee; color: #c00; }
-
         /* Estilos do PDF */
         .pdf-wrapper { background: white; width: 210mm; }
+        
         .page-a4 { 
             width: 210mm; 
-            min-height: 296mm; 
+            height: 296.5mm; 
             display: flex;
             flex-direction: column;
             background: white;
+            position: relative; 
+            box-sizing: border-box;
+            page-break-after: always;
         }
+
+        .bg-watermark {
+            position: absolute;
+            top: 45%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%;
+            opacity: 0.12; 
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Cabeçalho Ajustado - Sem Imagem e Cor Igual Rodapé */
         .pdf-header { 
-            height: 160px; 
-            display: flex; 
-            flex-direction: column; 
+            height: 120px; 
+            display: flex;
+            flex-direction: column;
             justify-content: center; 
             align-items: center; 
-            border-bottom: 2px solid var(--primary);
+            border-bottom: 2.5px solid var(--accent);
+            position: relative;
+            z-index: 1;
+            margin-bottom: 5mm;
+            padding: 15px 0;
+            color: var(--primary); /* Mesmo azul do rodapé */
         }
-        .pdf-header h1 { margin: 0; font-size: 24pt; color: var(--primary); font-family: 'Times New Roman', serif; }
-        .pdf-header p { margin: 5px 0 0; font-size: 10pt; letter-spacing: 4px; color: var(--accent); }
+
+        .pdf-header-title {
+            font-size: 28pt;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            font-family: 'Times New Roman', serif;
+        }
+
+        .pdf-header-subtitle {
+            font-size: 10pt;
+            font-weight: 600;
+            letter-spacing: 5px;
+            margin-top: 2px;
+            opacity: 0.9;
+        }
+
+        .pdf-header-empty {
+            height: 15mm;
+            width: 100%;
+        }
         
         .body-text { 
-            padding: 20mm 25mm; 
+            padding: 5mm 25mm 15mm 25mm; 
             text-align: justify; 
-            font-size: 11pt; 
-            line-height: 1.6; 
+            font-size: 10.5pt; 
+            line-height: 1.4; 
             flex-grow: 1;
             color: #000;
+            position: relative;
+            z-index: 1;
         }
         
-        .doc-title { text-align: center; font-weight: bold; margin-bottom: 30px; font-size: 13pt; text-transform: uppercase; }
+        .doc-title { text-align: center; font-weight: bold; margin-bottom: 15px; font-size: 12pt; text-transform: uppercase; }
         .client-data { font-weight: bold; }
-        .sig-box { margin-top: 40px; } 
-        .line { border-top: 1px solid #000; width: 280px; margin-bottom: 8px; }
+        
+        .sig-box { margin-top: 50px; } 
+        .line { border-top: 1.5px solid #000; width: 350px; margin-bottom: 8px; }
 
         .pdf-footer { 
             width: 100%; 
-            height: 80px; 
+            height: 70px; 
             background-color: var(--primary); 
             color: #ffffff; 
             display: flex; 
@@ -186,6 +222,10 @@
             font-size: 8pt; 
             padding: 0 40px; 
             box-sizing: border-box;
+            position: absolute; 
+            bottom: 0; 
+            left: 0;
+            z-index: 1;
         }
     </style>
 </head>
@@ -193,7 +233,7 @@
 
 <div class="navbar">
     <h1>Aluisio Marcos | Escritório de Advocacia</h1>
-    <span style="font-size: 11px; opacity: 0.8;">SISTEMA DE EMISSÃO DE DOCUMENTOS V2.0</span>
+    <span style="font-size: 11px; opacity: 0.8;">SISTEMA DE EMISSÃO DE DOCUMENTOS V2.1</span>
 </div>
 
 <div class="container-ui">
@@ -250,9 +290,14 @@
             <input type="text" id="cep" maxlength="9" placeholder="00000-000">
         </div>
 
-        <div class="input-group full">
+        <div class="input-group half">
           <label>Ação contra (Empresa/Réu)</label>
           <input type="text" id="processo" placeholder="Nome da empresa ou reclamada">
+        </div>
+        
+        <div class="input-group">
+            <label>Honorários (%)</label>
+            <input type="text" id="porcentagem" placeholder="Ex: 30" value="30">
         </div>
 
         <div class="action-bar">
@@ -265,32 +310,37 @@
 </div>
 
 <script>
-    // Máscaras de entrada
+    const IMG_MARCADAGUA = "https://raw.githubusercontent.com/Thiagoszaa/Docs/main/Logo%20principal%20-%20cor%204.png";
+
     const mask = (id, fn) => {
         const el = document.getElementById(id);
         if(el) el.addEventListener('input', e => e.target.value = fn(e.target.value));
     };
     
-    mask('cpf', v => 
-  v
-    .replace(/\D/g, '')     
-    .slice(0, 11)          
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-);
+    mask('cpf', v => v.replace(/\D/g, '').slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'));
     mask('pis', v => v.replace(/\D/g, '').replace(/(\d{3})(\d{5})(\d{2})(\d)/, '$1.$2.$3-$4'));
     mask('cep', v => v.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2'));
     mask('nascimento', v => v.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2').replace(/(\d{2})(\d)/, '$1/$2'));
 
+    function numeroParaExtenso(n) {
+        const num = parseInt(n);
+        const unidades = ["zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove", "vinte", "trinta", "quarenta", "cinquenta"];
+        if (num <= 20) return unidades[num];
+        if (num === 30) return "trinta";
+        if (num === 40) return "quarenta";
+        if (num === 50) return "cinquenta";
+        return n; 
+    }
+
     function getV() {
-        const fields = ['nome','estadoCivil','nacionalidade','profissao','rg','cpf','pis','nascimento','endereco','cep','processo'];
+        const fields = ['nome','estadoCivil','nacionalidade','profissao','rg','cpf','pis','nascimento','endereco','cep','processo', 'porcentagem'];
         let d = {}; 
         fields.forEach(f => {
             let el = document.getElementById(f);
             let val = el ? el.value : "";
             let finalVal = val.trim() === "" ? "________" : val;
             d[f] = `<span class="client-data">${f === 'nome' ? finalVal.toUpperCase() : finalVal}</span>`;
+            if(f === 'porcentagem') d.porcentagemExtenso = numeroParaExtenso(val);
         });
         const dataAtual = new Date();
         const meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -298,75 +348,86 @@
         return d;
     }
 
-    function layout(titulo, corpo, d) {
-        return `<div class="pdf-wrapper">
+    function criarPaginaHTML(titulo, corpo, d, incluirAssinatura = false, primeiraPagina = true) {
+        return `
             <div class="page-a4">
+                <img src="${IMG_MARCADAGUA}" class="bg-watermark">
+                ${primeiraPagina ? `
                 <div class="pdf-header">
-                    <h1>ALUISIO MARCOS DE SOUZA</h1>
-                    <p>ADVOGADOS ASSOCIADOS</p>
-                </div>
+                    <h1 class="pdf-header-title">Aluisio Marcos</h1>
+                    <div class="pdf-header-subtitle">ADVOGADOS ASSOCIADOS</div>
+                </div>` : '<div class="pdf-header-empty"></div>'}
+                
                 <div class="body-text">
-                    <div class="doc-title">${titulo}</div>
+                    ${titulo ? `<div class="doc-title">${titulo}</div>` : ''}
                     ${corpo}
-                    <p style="margin-top:40px">${d.hoje}.</p>
-                    <div class="sig-box">
-                        <div class="line"></div>
-                        ${d.nome}<br>
-                        CPF: ${d.cpf}
-                    </div>
+                    ${incluirAssinatura ? `
+                        <p style="margin-top:30px">${d.hoje}.</p>
+                        <div class="sig-box">
+                            <div class="line"></div>
+                            ${d.nome}<br>
+                            CPF: ${d.cpf}
+                        </div>
+                    ` : ''}
                 </div>
                 <div class="pdf-footer">
                     <div>Rua 1.036 com Alameda Couto Magalhães, Qd: 72, Lt: 01/02, Sala 10<br>Setor Pedro Ludovico, Goiânia, GO, Cep 74823-201</div>
                     <div style="text-align:right">+55 (62) 3157-3264<br>+55 (62) 98120-3430</div>
                 </div>
-            </div>
-        </div>`;
+            </div>`;
     }
 
     async function gerarDoc(tipo) {
         const d = getV();
-        let tit = "", html = "";
+        let tit = "", htmlFinal = "";
 
         if(tipo === 'proc') {
             tit = "PROCURAÇÃO “AD JUDICIA ET EXTRA”";
-            html = `<p>Através do presente instrumento particular de mandato, o Sr. ${d.nome}, ${d.nacionalidade}, ${d.estadoCivil}, ${d.profissao}, portador do RG n. ${d.rg}, inscrito no CPF n. ${d.cpf}, nascido em ${d.nascimento}, residente e domiciliado na ${d.endereco}, CEP: ${d.cep}, constitui e nomeia seu bastante procurador: <b>OUTORGADO: ALUISIO MARCOS DE SOUZA</b>, brasileiro, casado, advogado, inscrito na OAB-GO sob o nº. 38.376, com escritório profissional localizado na Rua 1.036 com Alameda Couto Magalhães, Qd: 72, Lt: 01/02, Sala 10, Setor Pedro Ludovico, Goiânia, Goiás, Cep 74823-2010, onde recebe as comunicações de estilo.</p>
-            <p><b>OBJETO:</b> representar o Outorgante, promovendo a defesa dos seus direitos e interesses. <b>PODERES:</b> Por este instrumento particular de procuração, constitui como bastante procurador o outorgado, concedendo-lhe os poderes inerentes da cláusula <i>ad judicia et extra</i>, para o foro em geral, cível, trabalhista, previdenciário e criminal, e especialmente para <span class="client-data">ingressar com ação trabalhista em desfavor de ${d.processo}</span>, podendo, portanto, promover quaisquer medidas judiciais ou administrativas, assinar termo, oferecer defesa, interpor recursos, ajuizar ações e conduzir os respectivos processos, solicitar, providenciar e ter acesso a documentos de qualquer natureza, sendo o presente instrumento de mandato oneroso e contratual podendo substabelecer este a outrem, com ou sem reserva de poderes, dando tudo por bom e valioso, a fim de praticar todos os demais atos necessários ao fiel desempenho deste mandato.</p>
+            let corpo = `<p>Através do presente instrumento particular de mandato, o Sr. ${d.nome}, ${d.nacionalidade}, ${d.estadoCivil}, ${d.profissao}, portador do RG n. ${d.rg}, inscrito no CPF n. ${d.cpf}, nascido em ${d.nascimento}, residente e domiciliado na ${d.endereco}, CEP: ${d.cep}, constitui e nomeia seu bastante procurador: <b>OUTORGADO: ALUISIO MARCOS DE SOUZA</b>, brasileiro, casado, advogado, inscrito na OAB-GO sob o nº. 38.376, com escritório profissional localizado na Rua 1.036 com Alameda Couto Magalhães, Qd: 72, Lt: 01/02, Sala 10, Setor Pedro Ludovico, Goiânia, Goiás, Cep 74823-2010, onde recebe as comunicações de estilo.</p>
+            <p><b>OBJETO:</b> representar o Outorgante, promovendo a defesa dos seus direitos e interesses. <b>PODERES:</b> Por este instrumento particular de procuração, constitui como bastante procurador o outorgado, concedendo-lhe os poderes inerentes da cláusula <i>ad judicia et extra</i>, para o foro em geral, cível, trabalhista, previdenciário e criminal, e especialmente para <span class="client-data">ingressar com ação trabalhista em desfavor de ${d.processo} e outros</span>, podendo, portanto, promover quaisquer medidas judiciais ou administrativas, assinar termo, oferecer defesa, interpor recursos, ajuizar ações e conduzir os respectivos processos, solicitar, providenciar e ter acesso a documentos de qualquer natureza, sendo o presente instrumento de mandato oneroso e contratual podendo substabelecer este a outrem, com ou sem reserva de poderes, dando tudo por bom e valioso, a fim de praticar todos os demais atos necessários ao fiel desempenho deste mandato.</p>
             <p><b>PODERES ESPECÍFICOS:</b> A presente procuração outorga ao Advogado acima descrito os poderes especiais para receber citação, confessar, reconhecer a procedência do pedido, transigir, desistir, renunciar ao direito sobre o que se funda a ação, firmar compromissos ou acordos, rever valores, dar e receber quitação, levantar ou receber RPV e ALVARÁS, pedir justiça gratuita e assinar declaração de hipossuficiência econômica, em conformidade com a norma do art. 105 da Lei 13.105/2015.</p>`;
+            htmlFinal = criarPaginaHTML(tit, corpo, d, true, true);
         } 
         else if(tipo === 'decl') {
             tit = "DECLARAÇÃO DE HIPOSSUFICIÊNCIA";
-            html = `<p>Eu, ${d.nome}, ${d.nacionalidade}, ${d.estadoCivil}, ${d.profissao}, portador do RG n. ${d.rg}, inscrito no CPF n. ${d.cpf}, residente na ${d.endereco}, CEP: ${d.cep}.</p>
+            let corpo = `<p>Eu, ${d.nome}, ${d.nacionalidade}, ${d.estadoCivil}, ${d.profissao}, portador do RG n. ${d.rg}, inscrito no CPF n. ${d.cpf}, residente na ${d.endereco}, CEP: ${d.cep}.</p>
             <p><b>DECLARO</b> que não posso suportar as despesas processuais decorrente demanda sem prejuízo do meu próprio sustento e de minha família, sendo, pois, para fins de concessão do benefício da gratuidade de justiça, nos termos da Lei 1.060/50, bem como do artigo 98 do Código de Processo Civil, por ser pobre no sentido legal da acepção.</p>
             <p><b>Declaro</b> ainda, que tenho conhecimento das sanções penais que estarei sujeito, caso inverídica a declaração prestada, sobretudo a disciplinado no artigo 299 do Código Penal.</p>`;
+            htmlFinal = criarPaginaHTML(tit, corpo, d, true, true);
         }
-        else {
+        else if(tipo === 'cont') {
             tit = "CONTRATO DE PRESTAÇÃO DE SERVIÇOS ADVOCATÍCIOS";
-            html = `<p><b>CONTRATANTE:</b> ${d.nome}, ${d.nacionalidade}, ${d.estadoCivil}, ${d.profissao}, portador do RG n. ${d.rg}, inscrito no CPF n. ${d.cpf}, PIS n. ${d.pis}, residente na ${d.endereco}, CEP: ${d.cep}.</p>
+            let parte1 = `<p><b>CONTRATANTE:</b> ${d.nome}, ${d.nacionalidade}, ${d.estadoCivil}, ${d.profissao}, portador do RG n. ${d.rg}, inscrito no CPF n. ${d.cpf}, PIS n. ${d.pis}, residente na ${d.endereco}, CEP: ${d.cep}.</p>
             <p><b>CONTRATADO:</b> <b>ALUISIO MARCOS DE SOUZA</b>, advogado inscrito nos quadros da OAB-GO sob o nº 38.376, com escritório na Rua 1.036 com Alameda Couto Magalhães, Qd: 72, Lt: 01/02, Sala 10, Setor Pedro Ludovico, Goiânia, Goiás, Cep 74823-2010, nesta capital, onde recebe as comunicações de praxe. Tem entre os mesmos, de maneira justa e acordada, o presente CONTRATO DE PRESTAÇÃO DE SERVIÇOS ADVOCATÍCIOS.</p>
             <p><b>Cláusula 1ª – DO OBJETO DO CONTRATO:</b> O presente instrumento tem como <b>OBJETIVO</b> a prestação de serviços advocatícios, em Ação Trabalhista em desfavor de ${d.processo}.</p>
             <p><b>Parágrafo Único:</b> As atividades inclusas na prestação de serviços, objeto deste instrumento, são todos os atos inerentes ao exercício da advocacia e aqueles constantes no Estatuto da Ordem dos Advogados do Brasil, bem como os especificados no instrumento Procuratório.</p>
             <p><b>Cláusula 2ª – DOS ATOS PROCESSUAIS:</b> Havendo necessidade de contratação de outro profissional, no decurso do processo, o CONTRATADO elaborará substabelecimento, indicando escritório de seu conhecimento, sendo facultado ao CONTRATANTE aceita-lo ou não. Aceitando, ficará sob a responsabilidade, única e exclusivamente do CONTRATANTE no que concerne aos honorários e às atividades a serem exercidas.</p>
-            <p><b>Cláusula 3ª – DA REMUNERAÇÃO:</b> A CONTRATANTE se compromete a pagar ao CONTRATADO o percentual de <span class="client-data">30% (trinta por cento)</span>, sobre o valor bruto da sentença, inclusive sobre FGTS e Seguro Desemprego.</p>
-            <p><b>Parágrafo Primeiro:</b> De antemão, esclarece que os honorários sucumbenciais, conforme Lei 8.906,94, pertence ao advogado independentemente de acordo pactuado, o que por ora já se pactua.</p>
+            <p><b>Cláusula 3ª – DA REMUNERAÇÃO:</b> A CONTRATANTE se compromete a pagar ao CONTRATADO o percentual de <span class="client-data">${document.getElementById('porcentagem').value}% (${d.porcentagemExtenso} por cento)</span>, sobre o valor bruto da sentença, inclusive sobre FGTS e Seguro Desemprego.</p>`;
+            
+            let parte2 = `<p><b>Parágrafo Primeiro:</b> De antemão, esclarece que os honorários sucumbenciais, conforme Lei 8.906,94, pertence ao advogado independentemente de acordo pactuado, o que por ora já se pactua.</p>
             <p><b>Parágrafo Segundo:</b> Havendo pagamento parcial ou parcelado ou até mesmo levantamento de deposito recursal, PRIMEIRAMENTE serão pagos a totalidade dos honorários advocatícios e honorários de sucumbência conforme pactuados.</p>
-            <p><b>Parágrafo Terceiro:</b> Em caso de negativa do Saque do FGTS pela Caixa Econômica Federal por adesão ao programa do Saque Aniversário; referida negativa não será obice e/ou impedimento para o pagamento dos honorários contratuais no percentual de 30% sobre referida verba (FGTS).</p>
+            <p><b>Parágrafo Terceiro:</b> Em caso de negativa do Saque do FGTS pela Caixa Econômica Federal por adesão ao programa do Saque Aniversário; referida negativa não será obice e/ou impedimento para o pagamento dos honorários contratuais no percentual de ${document.getElementById('porcentagem').value}% sobre referida verba (FGTS).</p>
             <p><b>Parágrafo Quarto:</b> Havendo desistência do processo ou falta injustificada em audiência por parte do CONTRATANTE e que ocasione o arquivamento do processo e/ou sentença de indeferimento dos pedidos, ficará o CONTRATANTE obrigado a pagar multa no percentual de 5% (cinco por cento) do valor da ação.</p>
-            <p><b>Cláusula 4ª – DAS DESPESAS:</b> As despesas, efetuadas pelo CONTRATADO, ligadas direta ou indiretamente com o certame, incluindo-se fotocópias, emolumentos, custas processuais, ficarão a cargo da CONTRATANTE.</p>
+            <p><b>Cláusula 4ª – DAS DESPESAS:</b> As das despesas, efetuadas pelo CONTRATADO, ligadas direta ou indiretamente com o certame, incluindo-se fotocópias, emolumentos, custas processuais, ficarão a cargo da CONTRATANTE.</p>
             <p><b>Cláusula 5ª – DAS DISPOSIÇÕES FINAIS:</b> O presente contrato passa a vigorar entre as partes a partir da assinatura do mesmo, as quais elegem o foro da cidade de Goiânia.</p>`;
+            htmlFinal = criarPaginaHTML(tit, parte1, d, false, true) + criarPaginaHTML("", parte2, d, true, false);
         }
 
         const container = document.createElement('div');
-        container.innerHTML = layout(tit, html, d);
+        container.classList.add('pdf-wrapper');
+        container.innerHTML = htmlFinal;
         
         const opt = {
             margin: 0,
             filename: `${tipo}_${document.getElementById('nome').value || 'documento'}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { scale: 4, dpi: 300, useCORS: true, letterRendering: true },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        html2pdf().set(opt).from(container).save();
+        setTimeout(() => {
+            html2pdf().set(opt).from(container).save();
+        }, 600);
     }
 </script>
 </body>
